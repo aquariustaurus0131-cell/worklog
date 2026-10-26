@@ -3,7 +3,7 @@
    - 頁面本身「網路優先」：有網路就拿最新版，沒網路用快取
    - 字型第一次載入後快取
    改了功能想強制更新時，把 VERSION 換成新字串即可。 */
-const VERSION = "worklog-v1";
+const VERSION = "worklog-v2";
 const SHELL = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const FONT_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com"];
 
