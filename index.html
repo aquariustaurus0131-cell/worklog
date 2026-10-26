@@ -1,5 +1,6 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#EDF4FB">
+<script>try{var u=JSON.parse(localStorage.getItem("worklog.ui")||"{}");if(u.theme==="light"||u.theme==="dark")document.documentElement.setAttribute("data-theme",u.theme)}catch(e){}</script>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -86,7 +87,7 @@ button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px
 
 /* tabs */
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: color-mix(in oklab, var(--surface) 92%, transparent); backdrop-filter: blur(10px); box-shadow: 0 -1px 0 var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
-.tabbar .in { max-width: 620px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); }
+.tabbar .in { max-width: 620px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr); }
 .tab { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 9px; font-size: 12px; font-weight: 600; color: var(--faint); }
 .tab svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .tab[aria-selected="true"] { color: var(--accent); }
@@ -558,14 +559,70 @@ mark { background: var(--hl); color: inherit; border-radius: 3px; padding: 0 2px
     </div>
     <div class="foot">
       <span id="storeNote">載入中…</span>
-      <span style="display:flex;gap:14px;flex-wrap:wrap">
-        <button class="linkbtn" id="exportBtn" hidden>匯出全部 CSV</button>
-        <button class="linkbtn" id="backupBtn" type="button">備份資料</button>
-        <button class="linkbtn" id="restoreBtn" type="button">還原備份</button>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="page" id="page-settings" data-page="settings" hidden>
+    <div class="panel">
+      <div class="ph"><h3>外觀</h3></div>
+      <div class="srow">
+        <div class="sl"><b>色彩模式</b><span class="hint">深色模式在晚上看比較不刺眼</span></div>
+        <div class="seg" role="group" aria-label="色彩模式">
+          <button type="button" id="thSys" aria-pressed="true">跟隨系統</button>
+          <button type="button" id="thLight" aria-pressed="false">淺色</button>
+          <button type="button" id="thDark" aria-pressed="false">深色</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h3>記錄與顯示</h3></div>
+      <div class="srow">
+        <div class="sl"><b>預設開始時間</b><span class="hint">當天還沒有任何紀錄時，新增一筆從這個時間開始</span></div>
+        <select id="setStart" aria-label="預設開始時間"></select>
+      </div>
+      <div class="srow">
+        <div class="sl"><b>預設時長</b><span class="hint">新增一筆時，結束時間自動帶入</span></div>
+        <div class="seg" id="setDur" role="group" aria-label="預設時長"></div>
+      </div>
+      <div class="srow">
+        <div class="sl"><b>每週從哪一天開始</b><span class="hint">影響「每週回顧」的範圍</span></div>
+        <div class="seg" id="setWeek" role="group" aria-label="每週起始日"></div>
+      </div>
+      <div class="srow">
+        <div class="sl"><b>開啟 app 時顯示</b></div>
+        <div class="seg" id="setOpen" role="group" aria-label="開啟時顯示的頁面"></div>
+      </div>
+      <p class="hint" style="margin:0">這些設定只存在這台裝置，手機和電腦可以各自調整。</p>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h3>帳號與同步</h3></div>
+      <div class="srow">
+        <div class="sl"><b id="acctState">未啟用雲端同步</b><span class="hint" id="acctHint">資料只存在這台裝置</span></div>
         <button class="linkbtn" id="accountBtn" type="button" hidden>帳號設定</button>
-      </span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph"><h3>資料</h3></div>
+      <div class="srow">
+        <div class="sl"><b>備份資料</b><span class="hint">存成檔案，換手機或出問題時可以還原</span></div>
+        <button class="linkbtn" id="backupBtn" type="button">備份</button>
+      </div>
+      <div class="srow">
+        <div class="sl"><b>還原備份</b><span class="hint">從備份檔匯入紀錄</span></div>
+        <button class="linkbtn" id="restoreBtn" type="button">選擇檔案</button>
+      </div>
+      <div class="srow">
+        <div class="sl"><b>匯出全部紀錄</b><span class="hint">CSV 格式，可用 Excel 開啟，不能還原</span></div>
+        <button class="linkbtn" id="exportBtn" type="button" hidden>匯出</button>
+      </div>
       <input type="file" id="restoreFile" accept=".json,application/json" hidden>
     </div>
+
+    <div class="foot"><span id="appVer"></span></div>
   </section>
 </div>
 
@@ -577,6 +634,7 @@ mark { background: var(--hl); color: inherit; border-radius: 3px; padding: 0 2px
     <button class="tab" role="tab" data-tab="day" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>今天</button>
     <button class="tab" role="tab" data-tab="stats" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M5 20V12M10 20V6M15 20v-9M20 20V9"/></svg>統計</button>
     <button class="tab" role="tab" data-tab="all" aria-selected="false"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>總覽</button>
+    <button class="tab" role="tab" data-tab="settings" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>設定</button>
   </div>
 </nav>
 
@@ -587,6 +645,10 @@ mark { background: var(--hl); color: inherit; border-radius: 3px; padding: 0 2px
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 @media (pointer: coarse) { input, select, textarea { font-size: 16px !important; } }
+.srow { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; }
+.srow .sl { display: flex; flex-direction: column; min-width: 0; flex: 1 1 190px; }
+.srow .sl b { font-weight: 700; }
+.srow select { font: inherit; font-size: 14px; font-weight: 700; padding: 6px 12px; border: 0; border-radius: 10px; background: var(--sel-bg); color: var(--sel-ink); }
 </style>
 <script>
 (() => {
@@ -642,6 +704,9 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   let ui = { view: "timeline", range: "7d", rFrom: null, rTo: null, tab: "log" };
   try { Object.assign(ui, JSON.parse(localStorage.getItem(LS_UI) || "{}")); } catch (e) {}
   const saveUi = () => { try { localStorage.setItem(LS_UI, JSON.stringify(ui)); } catch (e) {} };
+  const APP_VERSION = "v2"; /* keep in sync with VERSION in sw.js */
+  const defStart = () => (typeof ui.defStart === "number" ? ui.defStart : 9 * 60);
+  const defDur = () => ui.defDur || 60;
 
   const state = {
     day: ymd(new Date()),
@@ -696,9 +761,9 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
   function freshForm(keepProject) {
     const le = lastEnd(state.day);
-    let start = le != null ? le : 9 * 60;
+    let start = le != null ? le : defStart();
     if (start > 23 * 60) start = 23 * 60;
-    return { project: keepProject || null, task: null, start, end: Math.min(start + 60, 1439), mood: 0, skip: false, note: "", timeTouched: false };
+    return { project: keepProject || null, task: null, start, end: Math.min(start + defDur(), 1439), mood: 0, skip: false, note: "", timeTouched: false };
   }
   state.form = freshForm();
 
@@ -779,6 +844,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     if (!db) {
       store.loadLocal();
       $("storeNote").textContent = cloudFail ? "無法連上雲端，目前只用這台裝置的資料" : "資料存在這台裝置上，請定期備份";
+      if (cloudFail) { $("acctState").textContent = "無法連上雲端同步"; $("acctHint").textContent = "目前只用這台裝置的資料，連上網路後重新開啟即可"; }
       store.dl = webDownload; $("exportBtn").hidden = false;
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
       store.ready = true; refreshDefaultTimes(); render();
@@ -788,6 +854,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     $("storeNote").textContent = "資料已同步保存，手機和電腦都看得到";
     if (cloud) {
       $("accountBtn").hidden = false;
+      $("acctState").textContent = "雲端同步已開啟"; $("acctHint").textContent = cloud.email;
       store.dl = webDownload; $("exportBtn").hidden = false;
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     }
@@ -1577,7 +1644,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   const csvOf = rows => "\ufeff" + rows.map(r => r.map(v => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
 
   /* ---------- weekly review ---------- */
-  const weekStartOf = ds => { const d = parse(ds); return addDays(ds, -((d.getDay() + 6) % 7)); };
+  const weekStartOf = ds => { const d = parse(ds); return addDays(ds, -(ui.weekStart === 0 ? d.getDay() : (d.getDay() + 6) % 7)); };
   function weekRange(off) {
     const ws = addDays(weekStartOf(ymd(new Date())), off * 7);
     return { from: ws, to: addDays(ws, 6) };
@@ -1969,7 +2036,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     const id = state.editingId;
     $("saveBtn").disabled = true;
     state.editingId = null;
-    state.form = { project: f.project, task: null, start: entry.end, end: Math.min(entry.end + 60, 1439), mood: 0, skip: false, note: "", timeTouched: false };
+    state.form = { project: f.project, task: null, start: entry.end, end: Math.min(entry.end + defDur(), 1439), mood: 0, skip: false, note: "", timeTouched: false };
     $("note").value = "";
     render();
     await safe(() => store.saveEntry(entry, id),
@@ -2037,10 +2104,47 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     } catch (e) { snack("這不是有效的備份檔"); }
   };
 
+  /* ---------- settings page ---------- */
+  const THEME_COLOR = { light: "#EDF4FB", dark: "#141A29" };
+  const sysDark = () => { try { return !!window.matchMedia("(prefers-color-scheme: dark)").matches; } catch (e) { return false; } };
+  const THEMES = [["thSys", "system"], ["thLight", "light"], ["thDark", "dark"]];
+  function applyTheme() {
+    const t = ui.theme === "light" || ui.theme === "dark" ? ui.theme : "system";
+    const root = document.documentElement;
+    if (t === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", (t === "dark" || (t === "system" && sysDark())) ? THEME_COLOR.dark : THEME_COLOR.light);
+    THEMES.forEach(([id, v]) => $(id).setAttribute("aria-pressed", String(v === t)));
+  }
+  THEMES.forEach(([id, v]) => { $(id).onclick = () => { ui.theme = v; saveUi(); applyTheme(); }; });
+  try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (!ui.theme || ui.theme === "system") applyTheme(); }); } catch (e) {}
+
+  function seg(id, pairs, get, set) {
+    const box = $(id); box.innerHTML = "";
+    pairs.forEach(([v, label]) => {
+      const b = el("button", null, label); b.type = "button";
+      b.setAttribute("aria-pressed", String(get() === v));
+      b.onclick = () => { set(v); saveUi(); renderSettings(); };
+      box.append(b);
+    });
+  }
+  const startSel = $("setStart");
+  for (let m = 5 * 60; m <= 13 * 60; m += 30) { const o = el("option", null, hhmm(m)); o.value = String(m); startSel.append(o); }
+  startSel.onchange = () => { ui.defStart = Number(startSel.value); saveUi(); refreshDefaultTimes(); render(); };
+  function renderSettings() {
+    startSel.value = String(defStart());
+    seg("setDur", [[30, "30 分"], [60, "1 小時"], [90, "1.5 小時"], [120, "2 小時"]], defDur, v => { ui.defDur = v; refreshDefaultTimes(); render(); });
+    seg("setWeek", [[1, "週一"], [0, "週日"]], () => (ui.weekStart === 0 ? 0 : 1), v => { ui.weekStart = v; render(); });
+    seg("setOpen", [["last", "上次的頁面"], ["log", "記錄頁"]], () => (ui.openTab === "log" ? "log" : "last"), v => { ui.openTab = v; });
+  }
+  $("appVer").textContent = "每日工作日誌・版本 " + APP_VERSION;
+  applyTheme();
+  renderSettings();
+
   // keep the "now" line and live block fresh
   setInterval(() => { if (state.day === ymd(new Date()) && document.activeElement && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) render(); }, 60000);
 
-  goTab(["log", "day", "stats", "all"].includes(ui.tab) ? ui.tab : "log");
+  goTab(ui.openTab === "log" ? "log" : (["log", "day", "stats", "all", "settings"].includes(ui.tab) ? ui.tab : "log"));
   render();
   initStore();
 })();
