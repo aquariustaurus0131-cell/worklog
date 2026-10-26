@@ -562,6 +562,7 @@ mark { background: var(--hl); color: inherit; border-radius: 3px; padding: 0 2px
         <button class="linkbtn" id="exportBtn" hidden>匯出全部 CSV</button>
         <button class="linkbtn" id="backupBtn" type="button">備份資料</button>
         <button class="linkbtn" id="restoreBtn" type="button">還原備份</button>
+        <button class="linkbtn" id="logoutBtn" type="button" hidden>登出</button>
       </span>
       <input type="file" id="restoreFile" accept=".json,application/json" hidden>
     </div>
@@ -579,6 +580,8 @@ mark { background: var(--hl); color: inherit; border-radius: 3px; padding: 0 2px
   </div>
 </nav>
 
+<script src="firebase-config.js"></script>
+<script src="sync.js"></script>
 <style>
 /* PWA / iOS tweaks */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
@@ -766,11 +769,16 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   }
   async function initStore() {
     initSample();
-    let db = null;
+    let db = null, cloud = null, cloudFail = false;
     try { db = window.claude && window.claude.use ? await window.claude.use("db") : null; } catch (e) { db = null; }
+    if (!db && window.worklogCloud && window.worklogCloud.enabled) {
+      $("storeNote").textContent = "連線雲端中…";
+      try { cloud = await window.worklogCloud.connect(); } catch (e) { cloud = null; }
+      if (cloud) { db = cloud.db; store.cloud = cloud; } else cloudFail = true;
+    }
     if (!db) {
       store.loadLocal();
-      $("storeNote").textContent = "資料存在這台裝置上，請定期備份";
+      $("storeNote").textContent = cloudFail ? "無法連上雲端，目前只用這台裝置的資料" : "資料存在這台裝置上，請定期備份";
       store.dl = webDownload; $("exportBtn").hidden = false;
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
       store.ready = true; refreshDefaultTimes(); render();
@@ -778,6 +786,11 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     }
     store.mode = "db"; store.db = db; store.ready = true;
     $("storeNote").textContent = "資料已同步保存，手機和電腦都看得到";
+    if (cloud) {
+      $("logoutBtn").hidden = false; $("logoutBtn").textContent = "登出（" + cloud.email + "）";
+      store.dl = webDownload; $("exportBtn").hidden = false;
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    }
     db.doc("settings/lists").onSnapshot(snap => {
       if (snap.exists) state.cfg = normCfg(snap.data());
       render();
@@ -1995,6 +2008,11 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       snack("已匯出備份（" + state.entries.length + " 筆）");
     } catch (e) { snack("備份失敗，請再試一次"); }
   };
+  $("logoutBtn").onclick = async () => {
+    if (!confirm("要登出嗎？\n登出後這台裝置會回到登入畫面，雲端的紀錄不會被刪除。")) return;
+    try { await store.cloud.signOut(); } catch (e) {}
+    location.reload();
+  };
   $("restoreBtn").onclick = () => $("restoreFile").click();
   $("restoreFile").onchange = async ev => {
     const f = ev.target.files && ev.target.files[0];
@@ -2004,7 +2022,16 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       const o = JSON.parse(await f.text());
       if (!o || o.app !== "worklog" || !Array.isArray(o.entries)) throw new Error("bad backup");
       const list = o.entries.filter(e => e && typeof e.date === "string")
-        .map(e => normalize({ ...e, id: e.id || "l" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6) }));
+        .map(e => normalize({ ...e, id: e.id || "l" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+                              createdAt: typeof e.createdAt === "number" ? e.createdAt : Date.now() }));
+      if (store.mode === "db" && store.cloud) {
+        if (!confirm("要把這份備份的 " + list.length + " 筆紀錄合併到雲端嗎？\n（編號相同的紀錄會以備份為準，其他現有紀錄都會保留）")) return;
+        snack("正在上傳備份…");
+        const okAll = await store.cloud.bulkSet("entries", list.map(e => { const { id, ...d } = e; return { id, data: d }; }));
+        if (o.cfg) { try { state.cfg = normCfg(await store.cloud.mergeCfg(o.cfg)); render(); } catch (e) {} }
+        snack(okAll ? "已把 " + list.length + " 筆紀錄合併到雲端" : "備份已加入排隊，連上網路後會自動上傳");
+        return;
+      }
       if (!confirm("要用這份備份取代目前的資料嗎？\n目前 " + state.entries.length + " 筆 → 備份 " + list.length + " 筆")) return;
       state.entries = list;
       if (o.cfg) state.cfg = normCfg(o.cfg);
