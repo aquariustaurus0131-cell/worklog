@@ -88,6 +88,62 @@
     });
   }
 
+  var INPUT2 = "font:inherit;font-size:16px;padding:12px 14px;border:0;border-radius:12px;background:var(--sunk,#EEF3FA);color:inherit";
+  var ACC_HTML =
+    '<div style="width:100%;max-width:340px;background:var(--surface,#fff);border-radius:18px;padding:22px;box-shadow:0 8px 32px rgba(42,53,80,.18);display:flex;flex-direction:column;gap:12px">' +
+    '<div style="font-size:18px;font-weight:800">帳號設定</div>' +
+    '<div id="acEmail" style="font-size:13px;color:var(--muted,#7680A0);word-break:break-all"></div>' +
+    '<form id="acForm" style="display:flex;flex-direction:column;gap:10px">' +
+    '<div style="font-size:13px;font-weight:700">變更密碼</div>' +
+    '<input id="acCur" type="password" autocomplete="current-password" placeholder="目前的密碼" required style="' + INPUT2 + '">' +
+    '<input id="acNew" type="password" autocomplete="new-password" placeholder="新密碼（至少 6 個字元）" required style="' + INPUT2 + '">' +
+    '<div id="acMsg" role="alert" style="min-height:18px;font-size:13px;color:var(--danger,#C2566A)"></div>' +
+    '<button type="submit" id="acSave" style="' + BTN1 + '">更新密碼</button>' +
+    '</form>' +
+    '<button type="button" id="acReset" style="' + LINK + '">忘記目前的密碼？寄重設密碼信到我的信箱</button>' +
+    '<button type="button" id="acLogout" style="' + BTN2 + '">登出</button>' +
+    '<button type="button" id="acClose" style="' + LINK + '">關閉</button>' +
+    '</div>';
+
+  function pwErr(e) {
+    var c = (e && e.code) || "";
+    if (/invalid-credential|wrong-password/.test(c)) return "目前的密碼不正確";
+    if (/requires-recent-login/.test(c)) return "為了安全，請先登出再重新登入，然後再試一次";
+    if (/weak-password/.test(c)) return "新密碼太簡單，至少需要 6 個字元";
+    return authMsg(e);
+  }
+
+  function openAccountDialog(cloud) {
+    var wrap = document.createElement("div");
+    wrap.setAttribute("style", "position:fixed;top:0;right:0;bottom:0;left:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:24px;overflow:auto;background:rgba(42,53,80,.35);font-family:var(--f-body,system-ui,sans-serif);color:var(--ink,#2A3550)");
+    wrap.innerHTML = ACC_HTML;
+    document.body.appendChild(wrap);
+    var q = function (id) { return wrap.querySelector("#" + id); };
+    var msg = q("acMsg");
+    q("acEmail").textContent = cloud.email;
+    function close() { wrap.remove(); }
+    function say(t, ok) { msg.style.color = ok ? "var(--muted,#7680A0)" : ""; msg.textContent = t; }
+    q("acClose").onclick = close;
+    wrap.onclick = function (ev) { if (ev.target === wrap) close(); };
+    q("acForm").onsubmit = function (ev) {
+      ev.preventDefault();
+      var cur = q("acCur").value, nw = q("acNew").value;
+      if (nw.length < 6) { say("新密碼至少需要 6 個字元"); return; }
+      if (nw === cur) { say("新密碼不能和目前的密碼一樣"); return; }
+      q("acSave").disabled = true; say("");
+      cloud.changePassword(cur, nw).then(function () {
+        say("密碼已更新", true); q("acCur").value = ""; q("acNew").value = ""; q("acSave").disabled = false;
+      }, function (e) { say(pwErr(e)); q("acSave").disabled = false; });
+    };
+    q("acReset").onclick = function () {
+      cloud.sendReset().then(function () { say("已寄出重設密碼的信，請到信箱查看", true); }, function (e) { say(authMsg(e)); });
+    };
+    q("acLogout").onclick = function () {
+      if (!confirm("要登出嗎？\n登出後這台裝置會回到登入畫面，雲端的紀錄不會被刪除。")) return;
+      cloud.signOut().then(function () { location.reload(); }, function () { location.reload(); });
+    };
+  }
+
   function makeCloud(F, fs, user, Au, auth) {
     var base = "users/" + user.uid + "/";
 
@@ -120,7 +176,7 @@
       doc: function (path) { return wrapRef(F.doc(fs, base + path)); }
     };
 
-    return {
+    var self = {
       db: db,
       uid: user.uid,
       email: user.email || "",
@@ -145,8 +201,16 @@
         await fast(F.setDoc(ref, clean(merged)));
         return merged;
       },
-      signOut: function () { return Au.signOut(auth); }
+      signOut: function () { return Au.signOut(auth); },
+      changePassword: async function (cur, next) {
+        var u = auth.currentUser || user;
+        await Au.reauthenticateWithCredential(u, Au.EmailAuthProvider.credential(u.email, cur));
+        await Au.updatePassword(u, next);
+      },
+      sendReset: function () { return Au.sendPasswordResetEmail(auth, user.email); },
+      openAccount: function () { openAccountDialog(self); }
     };
+    return self;
   }
 
   /* 這台裝置上如果有還沒上傳的本機紀錄，登入後問一次要不要搬到雲端 */
