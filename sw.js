@@ -3,7 +3,7 @@
    - 頁面與程式檔（html／js／json）「網路優先」：有網路就拿最新版，沒網路或太慢就用快取
    - 圖示、字型、Firebase 程式庫：先用快取，背景再更新
    改了功能想強制更新時，把 VERSION 換成新字串即可。 */
-const VERSION = "worklog-v2";
+const VERSION = "worklog-v3";
 const SHELL = ["./", "index.html", "manifest.json", "firebase-config.js", "sync.js", "icon-192.png", "icon-512.png", "apple-touch-icon.png"];
 const CACHE_HOSTS = ["fonts.googleapis.com", "fonts.gstatic.com", "www.gstatic.com"];
 const SLOW_MS = 4000;

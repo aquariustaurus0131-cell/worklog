@@ -704,7 +704,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   let ui = { view: "timeline", range: "7d", rFrom: null, rTo: null, tab: "log" };
   try { Object.assign(ui, JSON.parse(localStorage.getItem(LS_UI) || "{}")); } catch (e) {}
   const saveUi = () => { try { localStorage.setItem(LS_UI, JSON.stringify(ui)); } catch (e) {} };
-  const APP_VERSION = "v2"; /* keep in sync with VERSION in sw.js */
+  const APP_VERSION = "v3"; /* keep in sync with VERSION in sw.js */
   const defStart = () => (typeof ui.defStart === "number" ? ui.defStart : 9 * 60);
   const defDur = () => ui.defDur || 60;
 
@@ -1390,7 +1390,9 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     const scored = inR.filter(e => typeof e.mood === "number" && days.includes(e.date));
     if (!scored.length) { box.append(el("div", "hint", "這段期間還沒有心情紀錄。記下幾筆工作後，這裡會畫出每天的心情變化。")); return; }
     const W = 360, H = 210, L = 30, R = 10, T = 18, B = 36;
-    const n = days.length, cw = (W - L - R) / n;
+    // days without any record are left out entirely, so the chart only shows days that actually have data
+    const shown = days.filter(ds => scored.some(e => e.date === ds));
+    const n = shown.length, cw = (W - L - R) / n;
     const y = v => T + (10 - v) / 20 * (H - T - B);
     const parts = [];
     // grid
@@ -1400,7 +1402,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     });
     // each entry, placed at its time of day inside the day's column (06:00–22:00 spread across the column)
     scored.forEach(e => {
-      const di = days.indexOf(e.date);
+      const di = shown.indexOf(e.date);
       const mid = typeof e.start === "number" ? (e.start + e.end) / 2 : 720;
       const frac = Math.min(1, Math.max(0, (mid - 360) / 960)) * 0.8 + 0.1;
       const r = 2 + Math.min(4, (e.minutes || 0) / 30);
@@ -1408,7 +1410,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       parts.push('<circle cx="' + (L + cw * (di + frac)).toFixed(1) + '" cy="' + y(e.mood).toFixed(1) + '" r="' + r.toFixed(1) + '" fill="' + moodInk(e.mood) + '" fill-opacity=".28"><title>' + esc(md(e.date) + " " + tip) + '</title></circle>');
     });
     // daily weighted average line
-    const daily = days.map((ds, i) => ({ ds, i, v: wmood(scored.filter(e => e.date === ds)) })).filter(d => d.v != null);
+    const daily = shown.map((ds, i) => ({ ds, i, v: wmood(scored.filter(e => e.date === ds)) })).filter(d => d.v != null);
     if (daily.length > 1) {
       const pts = daily.map(d => (L + cw * (d.i + .5)).toFixed(1) + "," + y(d.v).toFixed(1));
       parts.push('<polyline points="' + pts.join(" ") + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>');
@@ -1421,9 +1423,9 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     });
     // x labels
     const step = n <= 7 ? 1 : n <= 16 ? 2 : n <= 31 ? 5 : 7;
-    days.forEach((ds, i) => {
+    shown.forEach((ds, i) => {
       const d0 = parse(ds);
-      if (!(n <= 7 || i % step === 0 || d0.getDate() === 1)) return;
+      if (!(n <= 7 || i % step === 0)) return;
       const cx = L + cw * (i + .5);
       parts.push('<text x="' + cx.toFixed(1) + '" y="' + (H - B + 15) + '" text-anchor="middle" font-size="10" font-weight="700" fill="var(--muted)">' + (n <= 7 ? "週" + WD[d0.getDay()] : md(ds)) + '</text>');
       if (n <= 7) parts.push('<text x="' + cx.toFixed(1) + '" y="' + (H - B + 28) + '" text-anchor="middle" font-size="9.5" fill="var(--faint)">' + md(ds) + '</text>');
@@ -1434,7 +1436,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     wrap.querySelectorAll("[fill],[stroke]").forEach(nd => ["fill", "stroke"].forEach(k => { const v = nd.getAttribute(k); if (v && /var\(|color-mix/.test(v)) nd.style[k] = v; }));
     box.append(wrap);
     const lg = el("div", "mlegend");
-    lg.innerHTML = '<span><i class="ln"></i>每天的平均心情（依時間加權）</span><span><i class="dt"></i>每一筆紀錄，依時段排在當天位置，點越大做得越久</span>';
+    lg.innerHTML = '<span><i class="ln"></i>每天的平均心情（依時間加權）</span><span><i class="dt"></i>每一筆紀錄，依時段排在當天位置，點越大做得越久</span><span>沒有紀錄的日子不會顯示</span>';
     box.append(lg);
   }
 
