@@ -339,7 +339,39 @@ textarea::placeholder { color: var(--faint); }
 .reptasks span { font-size: 12px; font-weight: 600; background: var(--sunk); border-radius: 999px; padding: 2px 10px; }
 td.note { color: var(--muted); font-size: 13px; min-width: 9em; overflow-wrap: anywhere; }
 
-.mchart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.mchart { position: relative; }
+.mchart svg { width: 100%; height: auto; display: block; overflow: visible; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+.mtip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; align-items: center; background: var(--sunk); border-radius: 14px; padding: 10px 12px; margin-bottom: 10px; font-size: 13px; transition: background .15s; }
+.mtip.on { background: var(--sel-bg); }
+.mtip > .mt-h { grid-column: 1 / -1; }
+.mtip > .mt-s, .mtip > .mt-r { grid-column: 1 / -1; }
+.mtip .mt-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 14px; }
+.mtip .mt-v { font-family: var(--f-num); font-size: 20px; font-weight: 800; }
+.mtip .mt-s { font-size: 12px; color: var(--muted); }
+.mtip .mt-r { display: grid; grid-template-columns: auto auto 1fr; gap: 6px; align-items: baseline; font-size: 12px; }
+.mtip .mt-k { color: var(--muted); font-weight: 600; }
+.mtip .mt-r b { font-family: var(--f-num); font-weight: 800; }
+.mtip .mt-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mtip .mt-go { grid-column: 1 / -1; justify-self: start; border: 0; background: var(--surface); color: var(--sel-ink); font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 999px; margin-top: 2px; }
+.gbar { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: -2px; }
+.gbar::-webkit-scrollbar { display: none; }
+.gpill { flex: none; border: 0; background: transparent; border-bottom: 2px solid transparent; padding: 4px 4px 5px; margin-right: 8px; font-size: 13px; font-weight: 700; color: var(--muted); position: relative; }
+.gpill[aria-pressed="true"] { color: var(--sel-ink); border-bottom-color: var(--accent); }
+.gpill.has::after { content: ""; position: absolute; top: 2px; right: -5px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.gmanage { display: flex; flex-direction: column; gap: 14px; width: 100%; }
+.gsec { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--sunk); }
+.ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ghead .gname { font-size: 14px; font-weight: 800; }
+.ghead .addrow { flex: 1; }
+.gops { display: flex; gap: 4px; }
+.gop { border: 0; background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; color: var(--muted); min-width: 30px; }
+.gop.danger { color: var(--danger); }
+.gop.confirm { background: var(--danger); color: #FFFFFF; }
+.gsec .chips.editing .chip:not(.add):not([aria-pressed="true"]) { background: var(--surface); border-style: solid; border-color: transparent; }
+.gadd { align-self: flex-start; border: 1px dashed var(--faint); background: transparent; color: var(--accent); font-weight: 700; font-size: 13px; padding: 7px 14px; border-radius: 999px; }
+.mvrow { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.mvrow select { font: inherit; font-weight: 700; padding: 5px 10px; border: 0; border-radius: 10px; background: var(--surface); color: var(--sel-ink); }
+.mlegend .scrubhint { color: var(--accent); font-weight: 600; }
 .mlegend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--muted); }
 .mlegend span { display: inline-flex; align-items: center; gap: 6px; }
 .mlegend .ln { width: 16px; height: 3px; border-radius: 2px; background: var(--accent); }
@@ -410,6 +442,7 @@ mark { background: var(--hl); color: inherit; border-radius: 3px; padding: 0 2px
 
       <div class="field">
         <div class="label"><span>工作項目</span><button class="linkbtn" id="editTasks">管理</button></div>
+        <div class="gbar" id="taskGroups" role="group" aria-label="工作項目小標題" hidden></div>
         <div class="chips" id="taskChips"></div>
         <div id="taskArch"></div>
       </div>
@@ -655,7 +688,8 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   const DEFAULT_CFG = {
     projects: ["官網改版", "品牌提案", "內部行政"],
     tasks: ["會議", "設計", "撰寫文件", "溝通聯繫", "研究"],
-    archived: { projects: [], tasks: [] }
+    archived: { projects: [], tasks: [] },
+    groups: []
   };
   const DUR_PRESETS = [15, 30, 60, 90, 120, 180];
   const WD = ["日", "一", "二", "三", "四", "五", "六"];
@@ -704,7 +738,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   let ui = { view: "timeline", range: "7d", rFrom: null, rTo: null, tab: "log" };
   try { Object.assign(ui, JSON.parse(localStorage.getItem(LS_UI) || "{}")); } catch (e) {}
   const saveUi = () => { try { localStorage.setItem(LS_UI, JSON.stringify(ui)); } catch (e) {} };
-  const APP_VERSION = "v3"; /* keep in sync with VERSION in sw.js */
+  const APP_VERSION = "v4"; /* keep in sync with VERSION in sw.js */
   const defStart = () => (typeof ui.defStart === "number" ? ui.defStart : 9 * 60);
   const defDur = () => ui.defDur || 60;
 
@@ -735,7 +769,8 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     return {
       projects: [...(d.projects || [])],
       tasks: [...(d.tasks || [])],
-      archived: { projects: [...((d.archived && d.archived.projects) || [])], tasks: [...((d.archived && d.archived.tasks) || [])] }
+      archived: { projects: [...((d.archived && d.archived.projects) || [])], tasks: [...((d.archived && d.archived.tasks) || [])] },
+      groups: (d.groups || []).filter(g => g && g.name).map(g => ({ name: String(g.name), tasks: [...(g.tasks || [])] }))
     };
   }
   const active = kind => state.cfg[kind].filter(n => !state.cfg.archived[kind].includes(n));
@@ -810,7 +845,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     },
     async saveCfg() {
       render();
-      if (this.mode === "db") await this.db.doc("settings/lists").set({ projects: state.cfg.projects, tasks: state.cfg.tasks, archived: state.cfg.archived });
+      if (this.mode === "db") await this.db.doc("settings/lists").set({ projects: state.cfg.projects, tasks: state.cfg.tasks, archived: state.cfg.archived, groups: state.cfg.groups || [] });
       else this.persistLocal();
     },
     async saveTimer(t) {
@@ -861,6 +896,19 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     db.doc("settings/lists").onSnapshot(snap => {
       if (snap.exists) state.cfg = normCfg(snap.data());
       render();
+    }, () => {});
+    // default start time and duration follow the account, not just this device
+    db.doc("settings/prefs").onSnapshot(snap => {
+      if (snap.exists) {
+        const d = snap.data();
+        if (typeof d.defStart === "number") ui.defStart = d.defStart;
+        if (typeof d.defDur === "number") ui.defDur = d.defDur;
+        saveUi(); renderSettings();
+      } else if (typeof ui.defStart === "number" || ui.defDur) {
+        // first time on this account: upload what this device already had
+        db.doc("settings/prefs").set({ defStart: defStart(), defDur: defDur() }).catch(() => {});
+      }
+      refreshDefaultTimes(); render();
     }, () => {});
     db.doc("settings/timer").onSnapshot(snap => {
       const d = snap.exists ? snap.data() : null;
@@ -951,6 +999,13 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     state.cfg.archived[kind] = arch;
     if (kind === "projects" && state.form.project === oldN) state.form.project = newN;
     if (kind === "tasks" && state.form.task === oldN) state.form.task = newN;
+    if (kind === "tasks") {
+      const target = merging ? groupOf(newN) : null;
+      state.cfg.groups.forEach(g => {
+        g.tasks = g.tasks.map(t => t === oldN ? newN : t).filter((t, i, a) => a.indexOf(t) === i);
+        if (target && g.name !== target) g.tasks = g.tasks.filter(t => t !== newN);
+      });
+    }
     state.manageSel = { kind, name: newN };
     const field = fieldOf(kind);
     const affected = state.entries.filter(e => e[field] === oldN);
@@ -967,6 +1022,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     return affected.length;
   }
   function deleteItem(kind, name) {
+    if (kind === "tasks") state.cfg.groups.forEach(g => { g.tasks = g.tasks.filter(t => t !== name); });
     state.cfg[kind] = state.cfg[kind].filter(n => n !== name);
     state.cfg.archived[kind] = state.cfg.archived[kind].filter(n => n !== name);
     if (kind === "projects" && state.form.project === name) state.form.project = null;
@@ -996,6 +1052,14 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     };
     p.append(f);
     if (n) p.append(el("div", "hint", "改名會一併更新這 " + n + " 筆舊紀錄。改成已存在的名稱，兩者會合併。"));
+    if (kind === "tasks" && state.cfg.groups.length) {
+      const row = el("label", "mvrow"); row.append(el("span", null, "放在小標題"));
+      const selG = el("select"); selG.id = "moveGroup";
+      [["", "未分組"]].concat(state.cfg.groups.map(g => [g.name, g.name])).forEach(([v, t]) => { const o = el("option", null, t); o.value = v; selG.append(o); });
+      selG.value = groupOf(name) || "";
+      selG.onchange = () => { setTaskGroup(name, selG.value || null); safe(() => store.saveCfg(), selG.value ? "已移到「" + selG.value + "」" : "已移到未分組"); };
+      row.append(selG); p.append(row);
+    }
     const btns = el("div", "mbtns");
     const ar = el("button", "mb", archived ? "還原到選單" : "封存"); ar.type = "button";
     ar.onclick = () => {
@@ -1024,6 +1088,178 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         : "這個名稱沒有被任何紀錄用到，可以放心刪除。"));
     }
     return p;
+  }
+
+  /* ---------- task groups (小標題) ---------- */
+  const groupOf = t => { const g = state.cfg.groups.find(g => g.tasks.includes(t)); return g ? g.name : null; };
+  function setTaskGroup(t, gname) {
+    state.cfg.groups.forEach(g => { g.tasks = g.tasks.filter(x => x !== t); });
+    const g = gname && state.cfg.groups.find(g => g.name === gname);
+    if (g) g.tasks.push(t);
+  }
+  function addTask(v, gname) {
+    v = (v || "").trim(); if (!v) return false;
+    if (state.cfg.tasks.includes(v)) state.cfg.archived.tasks = state.cfg.archived.tasks.filter(n => n !== v);
+    else state.cfg.tasks.push(v);
+    if (gname !== undefined) setTaskGroup(v, gname || null);
+    return true;
+  }
+  function inlineAdd(placeholder, onAdd) {
+    const row = el("form", "addrow");
+    const inp = el("input"); inp.maxLength = 40; inp.placeholder = placeholder; inp.id = "addInline";
+    const b = el("button", null, "加入"); b.type = "submit";
+    row.append(inp, b);
+    row.onsubmit = ev => { ev.preventDefault(); onAdd(inp.value.trim()); };
+    setTimeout(() => { const i = $("addInline"); i && i.focus(); }, 0);
+    return row;
+  }
+  function currentGroup(act) {
+    const names = state.cfg.groups.map(g => g.name);
+    const hasUngrouped = act.some(t => !groupOf(t));
+    let cur = state.groupView;
+    if (cur == null && state.form.task) cur = groupOf(state.form.task) || "";
+    if (cur == null) cur = ui.taskGroup;
+    if (!(names.includes(cur) || (cur === "" && hasUngrouped))) cur = names[0] != null ? names[0] : "";
+    return cur;
+  }
+  function renderTasks() {
+    const box = $("taskChips"), arch = $("taskArch"), gbar = $("taskGroups");
+    box.innerHTML = ""; arch.innerHTML = ""; gbar.innerHTML = "";
+    box.classList.remove("editing");
+    if (state.editing.tasks) { gbar.hidden = true; renderTaskManage(box, arch); return; }
+    const act = active("tasks"), picked = state.form.task, groups = state.cfg.groups;
+    const chip = t => {
+      const b = el("button", "chip", t); b.type = "button";
+      b.setAttribute("aria-pressed", String(picked === t));
+      b.onclick = () => { state.form.task = picked === t ? null : t; render(); };
+      return b;
+    };
+    let list, gname;
+    if (!groups.length) {
+      gbar.hidden = true;
+      list = act.slice(); gname = undefined;
+    } else {
+      gbar.hidden = false;
+      const cur = currentGroup(act);
+      const pills = groups.map(g => [g.name, g.name]);
+      if (act.some(t => !groupOf(t))) pills.push(["", "未分組"]);
+      const pg = picked ? (groupOf(picked) || "") : null;
+      pills.forEach(([v, label]) => {
+        const b = el("button", "gpill", label); b.type = "button";
+        b.setAttribute("aria-pressed", String(v === cur));
+        if (pg === v && v !== cur) b.classList.add("has");
+        b.onclick = () => { state.groupView = v; ui.taskGroup = v; saveUi(); state.adding.tasks = false; render(); };
+        gbar.append(b);
+      });
+      list = cur === "" ? act.filter(t => !groupOf(t)) : (groups.find(g => g.name === cur).tasks.filter(t => act.includes(t)));
+      gname = cur;
+    }
+    if (picked && !list.includes(picked) && !act.includes(picked)) list.push(picked);
+    list.forEach(t => box.append(chip(t)));
+    if (!list.length) box.append(el("span", "hint", "這個小標題下面還沒有工作項目"));
+    if (state.adding.tasks) {
+      box.append(inlineAdd(gname ? "新增到「" + gname + "」" : "新工作項目", v => {
+        state.adding.tasks = false;
+        if (addTask(v, gname)) { state.form.task = v; store.saveCfg(); } else render();
+      }));
+    } else {
+      const add = el("button", "chip add", "＋ 新增"); add.type = "button";
+      add.onclick = () => { state.adding.tasks = true; render(); };
+      box.append(add);
+    }
+  }
+  function renderTaskManage(box, arch) {
+    const act = active("tasks"), groups = state.cfg.groups;
+    const sel = state.manageSel && state.manageSel.kind === "tasks" ? state.manageSel.name : null;
+    const wrap = el("div", "gmanage");
+    wrap.append(el("div", "hint", "點一個工作項目可以改名、移到別的小標題、封存或刪除。小標題可以改名、調整順序或刪除；刪除小標題不會刪掉底下的工作項目，它們會移到「未分組」。"));
+    const taskChip = t => {
+      const b = el("button", "chip", t); b.type = "button";
+      b.setAttribute("aria-pressed", String(sel === t));
+      b.onclick = () => { state.pendingRemove = null; state.manageSel = sel === t ? null : { kind: "tasks", name: t }; render(); };
+      return b;
+    };
+    const sections = groups.map((g, i) => ({ name: g.name, i, tasks: g.tasks.filter(t => act.includes(t)) }));
+    sections.push({ name: "", i: -1, tasks: act.filter(t => !groupOf(t)) });
+    sections.forEach(sec => {
+      const isG = sec.i >= 0;
+      if (!isG && !sec.tasks.length && groups.length) return;
+      const s = el("div", "gsec");
+      const h = el("div", "ghead");
+      if (isG && state.gRename === sec.name) {
+        const f = inlineAdd("小標題名稱", v => {
+          if (!v || v === sec.name) { state.gRename = null; render(); return; }
+          if (groups.some(g => g.name === v)) { flash("已經有叫「" + v + "」的小標題了"); return; }
+          groups[sec.i].name = v;
+          if (ui.taskGroup === sec.name) { ui.taskGroup = v; saveUi(); }
+          if (state.groupView === sec.name) state.groupView = v;
+          state.gRename = null;
+          safe(() => store.saveCfg(), "已改名為「" + v + "」");
+        });
+        f.querySelector("input").value = sec.name; f.querySelector("button").textContent = "改名";
+        h.append(f);
+      } else {
+        h.append(el("b", "gname", isG ? sec.name : (groups.length ? "未分組" : "工作項目")));
+        if (isG) {
+          const ops = el("span", "gops");
+          const btn = (t, label, fn, cls) => { const b = el("button", "gop" + (cls ? " " + cls : ""), t); b.type = "button"; b.setAttribute("aria-label", label); b.onclick = fn; ops.append(b); };
+          btn("↑", "往上移", () => { if (sec.i > 0) { [groups[sec.i - 1], groups[sec.i]] = [groups[sec.i], groups[sec.i - 1]]; store.saveCfg(); } });
+          btn("↓", "往下移", () => { if (sec.i < groups.length - 1) { [groups[sec.i + 1], groups[sec.i]] = [groups[sec.i], groups[sec.i + 1]]; store.saveCfg(); } });
+          btn("改名", "小標題改名", () => { state.gRename = sec.name; state.pendingGroupDel = null; render(); });
+          const pend = state.pendingGroupDel === sec.name;
+          btn(pend ? "確定刪除" : "刪除", "刪除小標題", () => {
+            if (!pend) { state.pendingGroupDel = sec.name; render(); return; }
+            state.pendingGroupDel = null;
+            state.cfg.groups = groups.filter(g => g.name !== sec.name);
+            if (state.groupView === sec.name) state.groupView = null;
+            safe(() => store.saveCfg(), "已刪除小標題「" + sec.name + "」，底下的項目移到未分組");
+          }, "danger" + (pend ? " confirm" : ""));
+          h.append(ops);
+        }
+      }
+      s.append(h);
+      if (isG && state.pendingGroupDel === sec.name) s.append(el("div", "warn", "刪除後，底下 " + sec.tasks.length + " 個工作項目會移到「未分組」，不會被刪掉。再按一次「確定刪除」。"));
+      const chips = el("div", "chips editing");
+      sec.tasks.forEach(t => chips.append(taskChip(t)));
+      const key = isG ? sec.name : "";
+      if (state.addingIn === key) {
+        chips.append(inlineAdd(isG ? "新增到「" + sec.name + "」" : "新工作項目", v => {
+          state.addingIn = null;
+          if (addTask(v, isG ? sec.name : null)) store.saveCfg(); else render();
+        }));
+      } else {
+        const add = el("button", "chip add", "＋ 子項目"); add.type = "button";
+        add.onclick = () => { state.addingIn = key; render(); };
+        chips.append(add);
+      }
+      s.append(chips);
+      if (sel && sec.tasks.includes(sel)) s.append(managePanel("tasks", sel));
+      wrap.append(s);
+    });
+    if (state.addingGroup) {
+      wrap.append(inlineAdd("小標題名稱，例如：行政", v => {
+        state.addingGroup = false;
+        if (!v) { render(); return; }
+        if (groups.some(g => g.name === v)) { flash("已經有叫「" + v + "」的小標題了"); render(); return; }
+        groups.push({ name: v, tasks: [] });
+        safe(() => store.saveCfg(), "已新增小標題「" + v + "」");
+      }));
+    } else {
+      const ag = el("button", "gadd", "＋ 新增小標題"); ag.type = "button";
+      ag.onclick = () => { state.addingGroup = true; render(); };
+      wrap.append(ag);
+    }
+    box.append(wrap);
+    const archived = state.cfg.archived.tasks;
+    if (archived.length) {
+      const ab = el("div", "archbox");
+      ab.append(el("div", "hint", "已封存（點一下可還原、改名或刪除）："));
+      const c = el("div", "chips");
+      archived.forEach(t => c.append(taskChip(t)));
+      ab.append(c);
+      if (sel && archived.includes(sel)) ab.append(managePanel("tasks", sel));
+      arch.append(ab);
+    }
   }
 
   function chipList(kind) {
@@ -1383,6 +1619,77 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   }
 
   const esc = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  /* stock-chart style read-out: tap or slide across the chart to see one day */
+  function attachMoodScrub(wrap, g) {
+    const svg = wrap.querySelector("svg");
+    const NS = "http://www.w3.org/2000/svg";
+    const mk = (tag, attrs) => { const n = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v)); return n; };
+    const guide = mk("line", { y1: g.T - 6, y2: g.H - g.B, "stroke-width": 1.5, "stroke-dasharray": "3 3" });
+    guide.style.stroke = "var(--accent)";
+    const dot = mk("circle", { r: 7, "stroke-width": 3 });
+    dot.style.fill = "var(--accent)"; dot.style.stroke = "var(--surface)";
+    const hl = mk("g", { visibility: "hidden" }); hl.append(guide, dot); svg.append(hl);
+    // the read-out sits above the chart (like a stock app's header), so it never covers the line
+    const tip = el("div", "mtip"); wrap.prepend(tip);
+    let cur = -1;
+    const last = g.shown.length - 1;
+    const show = (i, quiet) => {
+      if (i === cur && !quiet) return;
+      cur = quiet ? -1 : i;
+      const ds = g.shown[i];
+      const d = g.daily.find(x => x.i === i);
+      const cx = g.L + g.cw * (i + .5);
+      guide.setAttribute("x1", cx); guide.setAttribute("x2", cx);
+      if (d) { dot.setAttribute("cx", cx); dot.setAttribute("cy", g.y(d.v)); dot.style.display = ""; } else dot.style.display = "none";
+      hl.setAttribute("visibility", quiet ? "hidden" : "visible");
+      const es = g.scored.filter(e => e.date === ds);
+      const work = g.inR.filter(e => e.date === ds);
+      const mins = work.reduce((s, e) => s + (e.minutes || 0), 0);
+      const d0 = parse(ds);
+      tip.innerHTML = "";
+      const head = el("div", "mt-h"); head.append(el("b", null, md(ds) + " 週" + WD[d0.getDay()] + (quiet ? "（最近一天）" : "")));
+      const mv = el("span", "mt-v", d ? signed1(d.v) : "–"); mv.style.color = moodInk(d ? d.v : null);
+      head.append(mv); tip.append(head);
+      tip.append(el("div", "mt-s", "平均心情・工作 " + fmtH(mins) + " 小時・" + work.length + " 筆"));
+      if (es.length) {
+        const hi = es.reduce((a, e) => e.mood > a.mood ? e : a, es[0]);
+        const lo = es.reduce((a, e) => e.mood < a.mood ? e : a, es[0]);
+        const line = (k, e) => {
+          const r = el("div", "mt-r");
+          const n = el("b", null, signed(e.mood)); n.style.color = moodInk(e.mood);
+          r.append(el("span", "mt-k", k), n, el("span", "mt-t", (typeof e.start === "number" ? hhmm(e.start) + " " : "") + labelOf(e)));
+          return r;
+        };
+        tip.append(line("最高", hi));
+        if (lo !== hi) tip.append(line("最低", lo));
+      }
+      const go = el("button", "mt-go", "看這天的明細 ›"); go.type = "button";
+      go.onclick = ev => { ev.stopPropagation(); goDay(ds); goTab("day"); };
+      tip.append(go);
+      tip.classList.toggle("on", !quiet);
+    };
+    const hide = () => show(last, true);
+    hide();
+    const idxAt = clientX => {
+      const r = svg.getBoundingClientRect();
+      const sx = (clientX - r.left) / r.width * g.W;
+      return Math.min(g.shown.length - 1, Math.max(0, Math.floor((sx - g.L) / g.cw)));
+    };
+    let dragging = false;
+    svg.style.touchAction = "pan-y";
+    svg.style.cursor = "crosshair";
+    svg.addEventListener("pointerdown", ev => { dragging = true; show(idxAt(ev.clientX)); });
+    svg.addEventListener("pointermove", ev => { if (dragging || ev.pointerType === "mouse") show(idxAt(ev.clientX)); });
+    const end = () => { dragging = false; };
+    svg.addEventListener("pointerup", end);
+    svg.addEventListener("pointercancel", end);
+    svg.addEventListener("pointerleave", ev => { if (ev.pointerType === "mouse") hide(); });
+    moodScrub = { wrap, hide };
+  }
+  // one listener for the whole page: a tap anywhere outside the chart closes the read-out
+  let moodScrub = null;
+  document.addEventListener("pointerdown", ev => { if (moodScrub && moodScrub.wrap.isConnected && !moodScrub.wrap.contains(ev.target)) moodScrub.hide(); });
+
   function renderMoodChart(days, inR) {
     const box = $("moodChart"); box.innerHTML = "";
     $("moodRangeLbl").textContent = md(days[0]) + " – " + md(days[days.length - 1]);
@@ -1435,8 +1742,9 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     // CSS variables / color-mix belong in style, not in SVG presentation attributes
     wrap.querySelectorAll("[fill],[stroke]").forEach(nd => ["fill", "stroke"].forEach(k => { const v = nd.getAttribute(k); if (v && /var\(|color-mix/.test(v)) nd.style[k] = v; }));
     box.append(wrap);
+    attachMoodScrub(wrap, { shown, daily, scored, inR, L, W, T, H, B, cw, y });
     const lg = el("div", "mlegend");
-    lg.innerHTML = '<span><i class="ln"></i>每天的平均心情（依時間加權）</span><span><i class="dt"></i>每一筆紀錄，依時段排在當天位置，點越大做得越久</span><span>沒有紀錄的日子不會顯示</span>';
+    lg.innerHTML = '<span><i class="ln"></i>每天的平均心情（依時間加權）</span><span><i class="dt"></i>每一筆紀錄，依時段排在當天位置，點越大做得越久</span><span>沒有紀錄的日子不會顯示</span><span class="scrubhint">點一下或左右滑動圖表，上方會顯示那一天的心情</span>';
     box.append(lg);
   }
 
@@ -1790,7 +2098,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
     renderTimer();
     chipList("projects");
-    chipList("tasks");
+    renderTasks();
     $("editProjects").textContent = state.editing.projects ? "完成" : "管理";
     $("editTasks").textContent = state.editing.tasks ? "完成" : "管理";
 
@@ -1988,7 +2296,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   $("moodPlus").onclick = () => { state.form.mood = Math.min(10, state.form.mood + 1); render(); };
   $("note").oninput = e => { state.form.note = e.target.value; };
   $("editProjects").onclick = () => { state.editing.projects = !state.editing.projects; state.adding.projects = false; state.pendingRemove = null; state.manageSel = null; render(); };
-  $("editTasks").onclick = () => { state.editing.tasks = !state.editing.tasks; state.adding.tasks = false; state.pendingRemove = null; state.manageSel = null; render(); };
+  $("editTasks").onclick = () => { state.editing.tasks = !state.editing.tasks; state.adding.tasks = false; state.pendingRemove = null; state.manageSel = null; state.addingIn = null; state.addingGroup = false; state.gRename = null; state.pendingGroupDel = null; render(); };
   $("cancelEdit").onclick = () => { state.pendingDelete = null; resetForm(); render(); };
   $("delEdit").onclick = async () => {
     const id = state.editingId; if (!id) return;
@@ -2132,16 +2440,32 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   }
   const startSel = $("setStart");
   for (let m = 5 * 60; m <= 13 * 60; m += 30) { const o = el("option", null, hhmm(m)); o.value = String(m); startSel.append(o); }
-  startSel.onchange = () => { ui.defStart = Number(startSel.value); saveUi(); refreshDefaultTimes(); render(); };
+  const savePrefs = () => { if (store.mode === "db") store.db.doc("settings/prefs").set({ defStart: defStart(), defDur: defDur() }).catch(() => {}); };
+  startSel.onchange = () => { ui.defStart = Number(startSel.value); saveUi(); savePrefs(); refreshDefaultTimes(); render(); };
   function renderSettings() {
     startSel.value = String(defStart());
-    seg("setDur", [[30, "30 分"], [60, "1 小時"], [90, "1.5 小時"], [120, "2 小時"]], defDur, v => { ui.defDur = v; refreshDefaultTimes(); render(); });
+    seg("setDur", [[30, "30 分"], [60, "1 小時"], [90, "1.5 小時"], [120, "2 小時"]], defDur, v => { ui.defDur = v; savePrefs(); refreshDefaultTimes(); render(); });
     seg("setWeek", [[1, "週一"], [0, "週日"]], () => (ui.weekStart === 0 ? 0 : 1), v => { ui.weekStart = v; render(); });
     seg("setOpen", [["last", "上次的頁面"], ["log", "記錄頁"]], () => (ui.openTab === "log" ? "log" : "last"), v => { ui.openTab = v; });
   }
   $("appVer").textContent = "每日工作日誌・版本 " + APP_VERSION;
   applyTheme();
   renderSettings();
+
+  // a page left open overnight (or a home-screen app resumed the next morning) moves on to the new day
+  let seenToday = ymd(new Date());
+  function rollDay() {
+    const t = ymd(new Date());
+    if (t === seenToday) return;
+    if (state.day === seenToday) state.day = t;
+    seenToday = t;
+    if (!state.editingId) { state.form = freshForm(state.form.project); $("note").value = ""; }
+    render();
+  }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) rollDay(); });
+  window.addEventListener("focus", rollDay);
+  window.addEventListener("pageshow", rollDay);
+  setInterval(rollDay, 60000);
 
   // keep the "now" line and live block fresh
   setInterval(() => { if (state.day === ymd(new Date()) && document.activeElement && !/INPUT|TEXTAREA/.test(document.activeElement.tagName)) render(); }, 60000);

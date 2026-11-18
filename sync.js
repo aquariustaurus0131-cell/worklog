@@ -197,7 +197,8 @@
         try { var s = await F.getDoc(ref); if (s.exists()) c = s.data(); } catch (e) {}
         var u = function (a, b) { a = a || []; return a.concat((b || []).filter(function (x) { return a.indexOf(x) < 0; })); };
         var la = lc.archived || {}, ca = c.archived || {};
-        var merged = { projects: u(c.projects, lc.projects), tasks: u(c.tasks, lc.tasks), archived: { projects: u(ca.projects, la.projects), tasks: u(ca.tasks, la.tasks) } };
+        var merged = { projects: u(c.projects, lc.projects), tasks: u(c.tasks, lc.tasks), archived: { projects: u(ca.projects, la.projects), tasks: u(ca.tasks, la.tasks) },
+          groups: (c.groups && c.groups.length) ? c.groups : (lc.groups || []) };
         await fast(F.setDoc(ref, clean(merged)));
         return merged;
       },
