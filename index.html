@@ -738,7 +738,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   let ui = { view: "timeline", range: "7d", rFrom: null, rTo: null, tab: "log" };
   try { Object.assign(ui, JSON.parse(localStorage.getItem(LS_UI) || "{}")); } catch (e) {}
   const saveUi = () => { try { localStorage.setItem(LS_UI, JSON.stringify(ui)); } catch (e) {} };
-  const APP_VERSION = "v4"; /* keep in sync with VERSION in sw.js */
+  const APP_VERSION = "v5"; /* keep in sync with VERSION in sw.js */
   const defStart = () => (typeof ui.defStart === "number" ? ui.defStart : 9 * 60);
   const defDur = () => ui.defDur || 60;
 
@@ -1668,8 +1668,10 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       tip.append(go);
       tip.classList.toggle("on", !quiet);
     };
-    const hide = () => show(last, true);
-    hide();
+    // only touch the page when something is actually selected: iPhone Safari drops a tap
+    // (for example on the bottom tabs) if the page changes while the finger goes down
+    const hide = () => { if (cur !== -1) show(last, true); };
+    show(last, true);
     const idxAt = clientX => {
       const r = svg.getBoundingClientRect();
       const sx = (clientX - r.left) / r.width * g.W;
@@ -1688,7 +1690,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   }
   // one listener for the whole page: a tap anywhere outside the chart closes the read-out
   let moodScrub = null;
-  document.addEventListener("pointerdown", ev => { if (moodScrub && moodScrub.wrap.isConnected && !moodScrub.wrap.contains(ev.target)) moodScrub.hide(); });
+  document.addEventListener("click", ev => { if (moodScrub && moodScrub.wrap.isConnected && !moodScrub.wrap.contains(ev.target)) moodScrub.hide(); }, true);
 
   function renderMoodChart(days, inR) {
     const box = $("moodChart"); box.innerHTML = "";
