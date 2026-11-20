@@ -160,6 +160,7 @@
       return {
         id: ref.id,
         set: function (d) { return fast(F.setDoc(ref, clean(d))); },
+        update: function (d) { return fast(F.updateDoc(ref, clean(d))); },
         delete: function () { return fast(F.deleteDoc(ref)); },
         onSnapshot: function (ok, err) {
           return F.onSnapshot(ref, function (s) { ok({ id: s.id, exists: s.exists(), data: function () { return s.data(); } }); }, err);

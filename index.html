@@ -369,6 +369,7 @@ td.note { color: var(--muted); font-size: 13px; min-width: 9em; overflow-wrap: a
 .gop.confirm { background: var(--danger); color: #FFFFFF; }
 .gsec .chips.editing .chip:not(.add):not([aria-pressed="true"]) { background: var(--surface); border-style: solid; border-color: transparent; }
 .gadd { align-self: flex-start; border: 1px dashed var(--faint); background: transparent; color: var(--accent); font-weight: 700; font-size: 13px; padding: 7px 14px; border-radius: 999px; }
+.orphbox { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin-top: 10px; border-radius: 14px; background: color-mix(in oklab, var(--neg) 10%, var(--surface)); }
 .mvrow { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .mvrow select { font: inherit; font-weight: 700; padding: 5px 10px; border: 0; border-radius: 10px; background: var(--surface); color: var(--sel-ink); }
 .mlegend .scrubhint { color: var(--accent); font-weight: 600; }
@@ -738,7 +739,7 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   let ui = { view: "timeline", range: "7d", rFrom: null, rTo: null, tab: "log" };
   try { Object.assign(ui, JSON.parse(localStorage.getItem(LS_UI) || "{}")); } catch (e) {}
   const saveUi = () => { try { localStorage.setItem(LS_UI, JSON.stringify(ui)); } catch (e) {} };
-  const APP_VERSION = "v5"; /* keep in sync with VERSION in sw.js */
+  const APP_VERSION = "v6"; /* keep in sync with VERSION in sw.js */
   const defStart = () => (typeof ui.defStart === "number" ? ui.defStart : 9 * 60);
   const defDur = () => ui.defDur || 60;
 
@@ -1011,8 +1012,13 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     const affected = state.entries.filter(e => e[field] === oldN);
     await store.saveCfg();
     if (store.mode === "db") {
-      const col = store.db.collection("entries");
-      for (const e of affected) await col.doc(e.id).update({ [field]: newN });
+      if (store.cloud && store.cloud.bulkSet) {
+        // one batched write for all affected entries
+        await store.cloud.bulkSet("entries", affected.map(e => { const { id, ...d } = e; return { id, data: { ...d, [field]: newN } }; }));
+      } else {
+        const col = store.db.collection("entries");
+        for (const e of affected) await col.doc(e.id).update({ [field]: newN });
+      }
       store.older.forEach((e, k) => { if (e[field] === oldN) store.older.set(k, { ...e, [field]: newN }); });
       store.merge(); render();
     } else {
@@ -1088,6 +1094,45 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         : "這個名稱沒有被任何紀錄用到，可以放心刪除。"));
     }
     return p;
+  }
+
+  /* names that records still use but the menu no longer has (for example after an earlier rename that did not reach old records) */
+  function orphanBox(kind) {
+    const field = fieldOf(kind);
+    const names = [...new Set(state.entries.map(e => e[field]).filter(Boolean))]
+      .filter(n => !state.cfg[kind].includes(n));
+    if (!names.length) return null;
+    const box = el("div", "orphbox");
+    box.append(el("div", "mtitle", "紀錄裡還在用、但選單裡沒有的名稱"));
+    box.append(el("div", "hint", "通常是改名前的舊名稱。點一下，可以把這些紀錄改成選單裡的某個名稱，或把它加回選單。"));
+    const chips = el("div", "chips");
+    const sel = state.orphanSel && state.orphanSel.kind === kind ? state.orphanSel.name : null;
+    names.forEach(n => {
+      const b = el("button", "chip", n + "（" + state.entries.filter(e => e[field] === n).length + " 筆）"); b.type = "button";
+      b.setAttribute("aria-pressed", String(sel === n));
+      b.onclick = () => { state.orphanSel = sel === n ? null : { kind, name: n }; render(); };
+      chips.append(b);
+    });
+    box.append(chips);
+    if (sel && names.includes(sel)) {
+      const row = el("div", "mvrow");
+      row.append(el("span", null, "改成"));
+      const pick = el("select"); pick.id = "orphTo";
+      state.cfg[kind].forEach(n => { const o = el("option", null, n); o.value = n; pick.append(o); });
+      row.append(pick);
+      const go = el("button", "mb", "套用到這些紀錄"); go.type = "button";
+      go.onclick = async () => {
+        const to = pick.value; if (!to) return;
+        state.orphanSel = null;
+        try { const c = await renameItem(kind, sel, to); flash("已把 " + (c || 0) + " 筆「" + sel + "」改成「" + to + "」"); }
+        catch (e) { flash("沒有改成功，請檢查網路後再試一次"); }
+      };
+      const back = el("button", "mb quiet", "加回選單"); back.type = "button";
+      back.onclick = () => { state.cfg[kind].push(sel); state.orphanSel = null; safe(() => store.saveCfg(), "已把「" + sel + "」加回選單"); };
+      const btns = el("div", "mbtns"); btns.append(go, back);
+      box.append(row, btns);
+    }
+    return box;
   }
 
   /* ---------- task groups (小標題) ---------- */
@@ -1260,6 +1305,8 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       if (sel && archived.includes(sel)) ab.append(managePanel("tasks", sel));
       arch.append(ab);
     }
+    const ob = orphanBox("tasks");
+    if (ob) arch.append(ob);
   }
 
   function chipList(kind) {
@@ -1324,6 +1371,8 @@ button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
         box.append(wrap);
       }
       archEl.append(box);
+      const ob = orphanBox(kind);
+      if (ob) archEl.append(ob);
     }
   }
 
